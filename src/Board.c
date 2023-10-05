@@ -42,13 +42,15 @@ void FinitPawnTextures() {
 //////////////////////////////////////////////
 //// Board
 
-//forward declaration
+//forward declarations
 static void BoardHandleClick(Board* b);
+
 static void SetPossibleMove(Board* b,  int x, int y, unsigned char value);
 static unsigned char GetPossibleMove(Board* b, int x, int y);
-static void PossibleMovePawn(Board* b);
-static void PossibleMoveTower(Board* b);
-static void PossibleMoveKnight(Board* b);
+
+static void PossibleMovePawn(Board* b, int pawn_x, int pawn_y);
+static void PossibleMoveTower(Board* b, int pawn_x, int pawn_y);
+static void PossibleMoveKnight(Board* b, int pawn_x, int pawn_y);
 
 
 Board* MakeBoard() {
@@ -209,9 +211,9 @@ static void BoardHandleClick(Board* b) {
 
     //Determiner le type de la pièce
     switch(cell & 0x0f) {
-        case PawnType_Pawn: PossibleMovePawn(b); break;
-        case PawnType_Tower: PossibleMoveTower(b); break;
-        case PawnType_Knight: PossibleMoveKnight(b); break;
+        case PawnType_Pawn: PossibleMovePawn(b, b->overred_x, b->overred_y); break;
+        case PawnType_Tower: PossibleMoveTower(b, b->overred_x, b->overred_y); break;
+        case PawnType_Knight: PossibleMoveKnight(b, b->overred_x, b->overred_y); break;
         case PawnType_Crazy: break;
         case PawnType_Queen: break;
         case PawnType_King: break;
@@ -239,156 +241,162 @@ static int CanCapture(unsigned char source, unsigned char target) {
     return ((source >> 4) != (target >> 4));        //si les team sont différentes retourner true, sinon false
 }
 
-static void PossibleMovePawn(Board* b) {
+
+//Toutes les fonctions ci-dessous suivent la même forme : PossibleMove[...](b, pawn_x, pawn_y)
+// b : board
+// pawn_x : position x de la pièce dans b
+// pawn_y : position y de la pièce dans b
+
+static void PossibleMovePawn(Board* b, int pawn_x, int pawn_y) {
     printf("Pawn\n");
-    unsigned char pawn = b->cells[b->selected_cell];
+    unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
 
     int direction = ((pawn >> 4) == PawnTeam_White) ? -1 : 1;
 
     //Vérifier si une pièce est devant le pion
-    if(BoardGetPawn(b, b->overred_x, b->overred_y + 1*direction) == 0) {
+    if(BoardGetPawn(b, pawn_x, pawn_y + 1*direction) == 0) {
         //si non, la pièce peut bouger en avant
-        SetPossibleMove(b, b->overred_x, b->overred_y + 1*direction, 1);
+        SetPossibleMove(b, pawn_x, pawn_y + 1*direction, 1);
 
         //La pièce peut avancer de 2 uniquement si la pièce est dans son état initiale
-        if((direction == 1 && b->overred_y == 1) || (direction == -1 && b->overred_y == 6)) {
+        if((direction == 1 && pawn_y == 1) || (direction == -1 && pawn_y == 6)) {
             //Vérifier si la case est déjà occupé
-            if(BoardGetPawn(b, b->overred_x, b->overred_y + 2*direction) == 0) {
+            if(BoardGetPawn(b, pawn_x, pawn_y + 2*direction) == 0) {
                 //Si non la pièce peut bouger de 2 vers l'avant
-                SetPossibleMove(b, b->overred_x, b->overred_y + 2 * direction, 1);
+                SetPossibleMove(b, pawn_x, pawn_y + 2 * direction, 1);
             }
         }
     }
 
     //vérifier si une pièce de l'équipe adverse est en diag droit
-    unsigned char diag_right = BoardGetPawn(b, b->overred_x+1, b->overred_y + 1*direction);
+    unsigned char diag_right = BoardGetPawn(b, pawn_x+1, pawn_y + 1*direction);
     if(((diag_right >> 4) != 0) && (CanCapture(pawn, diag_right) == 1)) {  //vérifier team adverse
-        SetPossibleMove(b, b->overred_x+1, b->overred_y + 1*direction, 1);
+        SetPossibleMove(b, pawn_x+1, pawn_y + 1*direction, 1);
     }
 
     //vérifier si une pièce de l'équipe adverse est en diag gauche
-    unsigned char diag_left = BoardGetPawn(b, b->overred_x-1, b->overred_y + 1*direction);
+    unsigned char diag_left = BoardGetPawn(b, pawn_x-1, pawn_y + 1*direction);
     if(((diag_left >> 4) != 0) && (CanCapture(pawn, diag_left) == 1)) {  //vérifier team adverse
-        SetPossibleMove(b, b->overred_x-1, b->overred_y + 1*direction, 1);
+        SetPossibleMove(b, pawn_x-1, pawn_y + 1*direction, 1);
     }
 }
 
-static void PossibleMoveTower(Board* b) {
+static void PossibleMoveTower(Board* b, int pawn_x, int pawn_y) {
     printf("Tower\n");
-    unsigned char pawn = b->cells[b->selected_cell];
+    unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
 
     //haut
-    for(int y = b->overred_y-1; y >= 0; y--) {
-        unsigned char pawn_other = BoardGetPawn(b, b->overred_x, y);
+    for(int y = pawn_y-1; y >= 0; y--) {
+        unsigned char pawn_other = BoardGetPawn(b, pawn_x, y);
         if(pawn_other == 0) {   //case vide
-            SetPossibleMove(b, b->overred_x, y, 1);
+            SetPossibleMove(b, pawn_x, y, 1);
             continue;   //prochaine itération de la boucle
         }
         else {
             if(CanCapture(pawn, pawn_other) == 1) {  //pas la même équipe
-                SetPossibleMove(b, b->overred_x, y, 1);
+                SetPossibleMove(b, pawn_x, y, 1);
             }
             break;
         }
     }
 
     //bas
-    for(int y = b->overred_y+1; y < 8; y++) {
-        unsigned char pawn_other = BoardGetPawn(b, b->overred_x, y);
+    for(int y = pawn_y+1; y < 8; y++) {
+        unsigned char pawn_other = BoardGetPawn(b, pawn_x, y);
         if(pawn_other == 0) {   //case vide
-            SetPossibleMove(b, b->overred_x, y, 1);
+            SetPossibleMove(b, pawn_x, y, 1);
             continue;   //prochaine itération de la boucle
         }
         else {
             if(CanCapture(pawn, pawn_other) == 1) {  //pas la même équipe
-                SetPossibleMove(b, b->overred_x, y, 1);
+                SetPossibleMove(b, pawn_x, y, 1);
             }
             break;
         }
     }
 
     //gauche
-    for(int x = b->overred_x-1; x >= 0; x--) {
-        unsigned char pawn_other = BoardGetPawn(b, x, b->overred_y);
+    for(int x = pawn_x-1; x >= 0; x--) {
+        unsigned char pawn_other = BoardGetPawn(b, x, pawn_y);
         if(pawn_other == 0) {   //case vide
-            SetPossibleMove(b, x, b->overred_y, 1);
+            SetPossibleMove(b, x, pawn_y, 1);
             continue;   //prochaine itération de la boucle
         }
         else {
             if(CanCapture(pawn, pawn_other) == 1) {  //pas la même équipe
-                SetPossibleMove(b, x, b->overred_y, 1);
+                SetPossibleMove(b, x, pawn_y, 1);
             }
             break;
         }
     }
 
     //droite
-    for(int x = b->overred_x+1; x < 8; x++) {
-        unsigned char pawn_other = BoardGetPawn(b, x, b->overred_y);
+    for(int x = pawn_x+1; x < 8; x++) {
+        unsigned char pawn_other = BoardGetPawn(b, x, pawn_y);
         if(pawn_other == 0) {   //case vide
-            SetPossibleMove(b, x, b->overred_y, 1);
+            SetPossibleMove(b, x, pawn_y, 1);
             continue;   //prochaine itération de la boucle
         }
         else {
             if(CanCapture(pawn, pawn_other) == 1) {  //pas la même équipe
-                SetPossibleMove(b, x, b->overred_y, 1);
+                SetPossibleMove(b, x, pawn_y, 1);
             }
             break;
         }
     }
 }
 
-static void PossibleMoveKnight(Board* b) {
+static void PossibleMoveKnight(Board* b, int pawn_x, int pawn_y) {
     printf("Knight\n");
-    unsigned char pawn = b->cells[b->selected_cell];
+    unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
 
     unsigned char pawn_other = 0;
 
     //2haut 1gauche
-    pawn_other = BoardGetPawn(b, b->overred_x-1, b->overred_y-2);
+    pawn_other = BoardGetPawn(b, pawn_x-1, pawn_y-2);
     if((pawn_other == 0) || (CanCapture(pawn, pawn_other) == 1)) {
-        SetPossibleMove(b, b->overred_x-1, b->overred_y-2, 1);
+        SetPossibleMove(b, pawn_x-1, pawn_y-2, 1);
     }
 
     //2haut 1droit
-    pawn_other = BoardGetPawn(b, b->overred_x+1, b->overred_y-2);
+    pawn_other = BoardGetPawn(b, pawn_x+1, pawn_y-2);
     if((pawn_other == 0) || (CanCapture(pawn, pawn_other) == 1)) {
-        SetPossibleMove(b, b->overred_x+1, b->overred_y-2, 1);
+        SetPossibleMove(b, pawn_x+1, pawn_y-2, 1);
     }
 
     //2bas 1gauche
-    pawn_other = BoardGetPawn(b, b->overred_x-1, b->overred_y+2);
+    pawn_other = BoardGetPawn(b, pawn_x-1, pawn_y+2);
     if((pawn_other == 0) || (CanCapture(pawn, pawn_other) == 1)) {
-        SetPossibleMove(b, b->overred_x-1, b->overred_y+2, 1);
+        SetPossibleMove(b, pawn_x-1, pawn_y+2, 1);
     }
 
     //2bas 1droit
-    pawn_other = BoardGetPawn(b, b->overred_x+1, b->overred_y+2);
+    pawn_other = BoardGetPawn(b, pawn_x+1, pawn_y+2);
     if((pawn_other == 0) || (CanCapture(pawn, pawn_other) == 1)) {
-        SetPossibleMove(b, b->overred_x+1, b->overred_y+2, 1);
+        SetPossibleMove(b, pawn_x+1, pawn_y+2, 1);
     }
 
     //2gauche 1haut
-    pawn_other = BoardGetPawn(b, b->overred_x-2, b->overred_y-1);
+    pawn_other = BoardGetPawn(b, pawn_x-2, pawn_y-1);
     if((pawn_other == 0) || (CanCapture(pawn, pawn_other) == 1)) {
-        SetPossibleMove(b, b->overred_x-2, b->overred_y-1, 1);
+        SetPossibleMove(b, pawn_x-2, pawn_y-1, 1);
     }
 
     //2gauche 1bas
-    pawn_other = BoardGetPawn(b, b->overred_x-2, b->overred_y+1);
+    pawn_other = BoardGetPawn(b, pawn_x-2, pawn_y+1);
     if((pawn_other == 0) || (CanCapture(pawn, pawn_other) == 1)) {
-        SetPossibleMove(b, b->overred_x-2, b->overred_y+1, 1);
+        SetPossibleMove(b, pawn_x-2, pawn_y+1, 1);
     }
 
     //2droit 1haut
-    pawn_other = BoardGetPawn(b, b->overred_x+2, b->overred_y-1);
+    pawn_other = BoardGetPawn(b, pawn_x+2, pawn_y-1);
     if((pawn_other == 0) || (CanCapture(pawn, pawn_other) == 1)) {
-        SetPossibleMove(b, b->overred_x+2, b->overred_y-1, 1);
+        SetPossibleMove(b, pawn_x+2, pawn_y-1, 1);
     }
 
     //2droit 1bas
-    pawn_other = BoardGetPawn(b, b->overred_x+2, b->overred_y+1);
+    pawn_other = BoardGetPawn(b, pawn_x+2, pawn_y+1);
     if((pawn_other == 0) || (CanCapture(pawn, pawn_other) == 1)) {
-        SetPossibleMove(b, b->overred_x+2, b->overred_y+1, 1);
+        SetPossibleMove(b, pawn_x+2, pawn_y+1, 1);
     }
 }
