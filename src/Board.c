@@ -197,7 +197,10 @@ static void BoardHandleClick(Board* b) {
             //Reset les variables lié au déplacement
             b->selected_cell = -1;
             for(int i = 0; i < 64; i++) b->possible_moves[i] = 0;
-            //Passer au tour du joueur suivant
+
+            //TODO : vérifier si le roi est en échec et si oui undo le mouvement
+
+            //Passer au tour du joueur suivant si le roi n'est pas en échec
             b->current_turn = (b->current_turn == PawnTeam_White) ? PawnTeam_Black : PawnTeam_White;
         }
         return;
@@ -386,68 +389,27 @@ static void PossibleMoveKnight(Board* b, int pawn_x, int pawn_y) {
     unsigned char pawn_other = 0;
     int capture = 0;
 
-    //2haut 1gauche
-    pawn_other = BoardGetPawn(b, pawn_x-1, pawn_y-2);
-    capture = CanCapture(pawn, pawn_other);
-    if(capture == 2) can_eat_king = true;
-    if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
-        SetPossibleMove(b, pawn_x-1, pawn_y-2, 1);
-    }
+    const int relative_positions[8][2] = {
+            {-1,-2},    //2haut 1gauche
+            {1,-2},     //2haut 1droit
+            {-1,2},     //2bas 1gauche
+            {1,2},      //2bas 1droit
+            {-2,-1},    //2gauche 1haut
+            {-2,1},     //2gauche 1bas
+            {2,-1},     //2droit 1haut
+            {2,1}       //2droit 1bas
+    };
 
-    //2haut 1droit
-    pawn_other = BoardGetPawn(b, pawn_x+1, pawn_y-2);
-    capture = CanCapture(pawn, pawn_other);
-    if(capture == 2) can_eat_king = true;
-    if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
-        SetPossibleMove(b, pawn_x+1, pawn_y-2, 1);
-    }
+    for(int i = 0; i < 8; i++) {
+        int offset_x = relative_positions[i][0];
+        int offset_y = relative_positions[i][1];
 
-    //2bas 1gauche
-    pawn_other = BoardGetPawn(b, pawn_x-1, pawn_y+2);
-    capture = CanCapture(pawn, pawn_other);
-    if(capture == 2) can_eat_king = true;
-    if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
-        SetPossibleMove(b, pawn_x-1, pawn_y+2, 1);
-    }
-
-    //2bas 1droit
-    pawn_other = BoardGetPawn(b, pawn_x+1, pawn_y+2);
-    capture = CanCapture(pawn, pawn_other);
-    if(capture == 2) can_eat_king = true;
-    if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
-        SetPossibleMove(b, pawn_x+1, pawn_y+2, 1);
-    }
-
-    //2gauche 1haut
-    pawn_other = BoardGetPawn(b, pawn_x-2, pawn_y-1);
-    capture = CanCapture(pawn, pawn_other);
-    if(capture == 2) can_eat_king = true;
-    if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
-        SetPossibleMove(b, pawn_x-2, pawn_y-1, 1);
-    }
-
-    //2gauche 1bas
-    pawn_other = BoardGetPawn(b, pawn_x-2, pawn_y+1);
-    capture = CanCapture(pawn, pawn_other);
-    if(capture == 2) can_eat_king = true;
-    if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
-        SetPossibleMove(b, pawn_x-2, pawn_y+1, 1);
-    }
-
-    //2droit 1haut
-    pawn_other = BoardGetPawn(b, pawn_x+2, pawn_y-1);
-    capture = CanCapture(pawn, pawn_other);
-    if(capture == 2) can_eat_king = true;
-    if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
-        SetPossibleMove(b, pawn_x+2, pawn_y-1, 1);
-    }
-
-    //2droit 1bas
-    pawn_other = BoardGetPawn(b, pawn_x+2, pawn_y+1);
-    capture = CanCapture(pawn, pawn_other);
-    if(capture == 2) can_eat_king = true;
-    if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
-        SetPossibleMove(b, pawn_x+2, pawn_y+1, 1);
+        pawn_other = BoardGetPawn(b, pawn_x+offset_x, pawn_y+offset_y);
+        capture = CanCapture(pawn, pawn_other);
+        if(capture == 2) can_eat_king = true;
+        if((pawn_other == 0) || (capture == 1)) {   //case vide ou pièce d'une autre team
+            SetPossibleMove(b, pawn_x+offset_x, pawn_y+offset_y, 1);
+        }
     }
 
     if(can_eat_king) printf("CAN EAT KING\n");
