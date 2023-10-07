@@ -44,16 +44,17 @@ void FinitPawnTextures() {
 
 //forward declarations
 static void BoardHandleClick(Board* b);
+static bool CheckCanCaptureKing(Board* b, enum PawnTeam team);
 
 static void SetPossibleMove(Board* b,  int x, int y, unsigned char value);
 static unsigned char GetPossibleMove(Board* b, int x, int y);
 
-static void PossibleMovePawn(Board* b, int pawn_x, int pawn_y);
-static void PossibleMoveTower(Board* b, int pawn_x, int pawn_y);
-static void PossibleMoveKnight(Board* b, int pawn_x, int pawn_y);
-static void PossibleMoveCrazy(Board* b, int pawn_x, int pawn_y);
-static void PossibleMoveQueen(Board* b, int pawn_x, int pawn_y);
-static void PossibleMoveKing(Board* b, int pawn_x, int pawn_y);
+static bool PossibleMovePawn(Board* b, int pawn_x, int pawn_y);
+static bool PossibleMoveTower(Board* b, int pawn_x, int pawn_y);
+static bool PossibleMoveKnight(Board* b, int pawn_x, int pawn_y);
+static bool PossibleMoveCrazy(Board* b, int pawn_x, int pawn_y);
+static bool PossibleMoveQueen(Board* b, int pawn_x, int pawn_y);
+static bool PossibleMoveKing(Board* b, int pawn_x, int pawn_y);
 
 
 Board* MakeBoard() {
@@ -195,16 +196,32 @@ static void BoardHandleClick(Board* b) {
         //vérifier si la pièce selectionné peut bouger sur la case cliqué
         if(b->possible_moves[overred_index] == 1) {
             //si oui déplacer la case
+            unsigned char overred_backup = b->cells[overred_index];
             b->cells[overred_index] = b->cells[b->selected_cell];
             b->cells[b->selected_cell] = 0;
+
+
+            //vérifier si l'autre team peut capturer le roi de la team actuel et si oui undo le mouvement
+            enum PawnTeam other_team = (b->current_turn == PawnTeam_White) ? PawnTeam_Black : PawnTeam_White;
+            printf("Checking\n");
+            if(CheckCanCaptureKing(b, other_team)) {
+                printf("OH NO\n");
+                //Undo le mouvement
+                b->cells[b->selected_cell] = b->cells[overred_index];
+                b->cells[overred_index] = overred_backup;
+
+                //Reset les variables lié au déplacement
+                b->selected_cell = -1;
+                for(int i = 0; i < 64; i++) b->possible_moves[i] = 0;
+                return;
+            }
+
             //Reset les variables lié au déplacement
             b->selected_cell = -1;
             for(int i = 0; i < 64; i++) b->possible_moves[i] = 0;
 
-            //TODO : vérifier si le roi est en échec et si oui undo le mouvement
-
             //Passer au tour du joueur suivant si le roi n'est pas en échec
-            b->current_turn = (b->current_turn == PawnTeam_White) ? PawnTeam_Black : PawnTeam_White;
+            b->current_turn = other_team;
         }
         return;
     }
@@ -225,6 +242,32 @@ static void BoardHandleClick(Board* b) {
         case PawnType_King: PossibleMoveKing(b, b->overred_x, b->overred_y); break;
         default: /* rien */ break;
     }
+}
+
+
+//vérifier si la team "team" peut capturer le roi adverse
+static bool CheckCanCaptureKing(Board* b, enum PawnTeam team) {
+    for(int y = 0; y < 8; y++) {
+        for(int x = 0; x < 8; x++) {
+            unsigned char cell = BoardGetPawn(b, x, y);
+            if((cell >> 4) != team) continue;
+            bool result = false;
+
+            switch(cell & 0x0f) {
+                case PawnType_Pawn: result = PossibleMovePawn(b, x, y); break;
+                case PawnType_Tower: result = PossibleMoveTower(b, x, y); break;
+                case PawnType_Knight: result = PossibleMoveKnight(b,x, y); break;
+                case PawnType_Crazy: result = PossibleMoveCrazy(b, x, y); break;
+                case PawnType_Queen: result = PossibleMoveQueen(b, x, y); break;
+                case PawnType_King: result = PossibleMoveKing(b, x, y); break;
+                default: result = false; break;
+            }
+
+            if(result == true) return true;
+        }
+    }
+
+    return false;
 }
 
 
@@ -254,8 +297,8 @@ static int CanCapture(unsigned char source, unsigned char target) {
 // pawn_x : position x de la pièce dans b
 // pawn_y : position y de la pièce dans b
 
-static void PossibleMovePawn(Board* b, int pawn_x, int pawn_y) {
-    printf("Pawn\n");
+static bool PossibleMovePawn(Board* b, int pawn_x, int pawn_y) {
+    //printf("Pawn\n");
     unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
 
     int direction = ((pawn >> 4) == PawnTeam_White) ? -1 : 1;
@@ -293,12 +336,11 @@ static void PossibleMovePawn(Board* b, int pawn_x, int pawn_y) {
         SetPossibleMove(b, pawn_x-1, pawn_y + 1*direction, 1);
     }
 
-    if(can_eat_king) printf("CAN EAT KING\n");
-    //return can_eat_king;
+    return can_eat_king;
 }
 
-static void PossibleMoveTower(Board* b, int pawn_x, int pawn_y) {
-    printf("Tower\n");
+static bool PossibleMoveTower(Board* b, int pawn_x, int pawn_y) {
+    //printf("Tower\n");
     unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
 
     bool can_eat_king = false;  //true si la pièce est en mesure de capturer le roi adverse
@@ -379,12 +421,11 @@ static void PossibleMoveTower(Board* b, int pawn_x, int pawn_y) {
         }
     }
 
-    if(can_eat_king) printf("CAN EAT KING\n");
-    //return can_eat_king;
+    return can_eat_king;
 }
 
-static void PossibleMoveKnight(Board* b, int pawn_x, int pawn_y) {
-    printf("Knight\n");
+static bool PossibleMoveKnight(Board* b, int pawn_x, int pawn_y) {
+    //printf("Knight\n");
     unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
 
     bool can_eat_king = false;  //true si la pièce est en mesure de capturer le roi adverse
@@ -415,12 +456,11 @@ static void PossibleMoveKnight(Board* b, int pawn_x, int pawn_y) {
         }
     }
 
-    if(can_eat_king) printf("CAN EAT KING\n");
-    //return can_eat_king;
+    return can_eat_king;
 }
 
-static void PossibleMoveCrazy(Board* b, int pawn_x, int pawn_y) {
-    printf("Crazy\n");
+static bool PossibleMoveCrazy(Board* b, int pawn_x, int pawn_y) {
+    //printf("Crazy\n");
     unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
 
     bool can_eat_king = false;  //true si la pièce est en mesure de capturer le roi adverse
@@ -457,20 +497,15 @@ static void PossibleMoveCrazy(Board* b, int pawn_x, int pawn_y) {
         }
     }
 
-    if(can_eat_king) printf("CAN EAT KING\n");
-    //return can_eat_king;
+    return can_eat_king;
 }
 
-static void PossibleMoveQueen(Board* b, int pawn_x, int pawn_y) {
-    PossibleMoveTower(b, pawn_x, pawn_y);
-    PossibleMoveCrazy(b, pawn_x, pawn_y);
-
-    //bool can_eat_king = PossibleMoveTower(b, pawn_x, pawn_y) | PossibleMoveCrazy(b, pawn_x, pawn_y);
-    //return can_eat_king;
+static bool PossibleMoveQueen(Board* b, int pawn_x, int pawn_y) {
+    return PossibleMoveTower(b, pawn_x, pawn_y) | PossibleMoveCrazy(b, pawn_x, pawn_y);
 }
 
-static void PossibleMoveKing(Board* b, int pawn_x, int pawn_y) {
-    printf("King\n");
+static bool PossibleMoveKing(Board* b, int pawn_x, int pawn_y) {
+    //printf("King\n");
     unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
 
     bool can_eat_king = false;  //true si la pièce est en mesure de capturer le roi adverse
@@ -491,5 +526,5 @@ static void PossibleMoveKing(Board* b, int pawn_x, int pawn_y) {
         }
     }
 
-    //return can_eat_king;
+    return can_eat_king;
 }
