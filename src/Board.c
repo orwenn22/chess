@@ -51,6 +51,9 @@ static unsigned char GetPossibleMove(Board* b, int x, int y);
 static void PossibleMovePawn(Board* b, int pawn_x, int pawn_y);
 static void PossibleMoveTower(Board* b, int pawn_x, int pawn_y);
 static void PossibleMoveKnight(Board* b, int pawn_x, int pawn_y);
+static void PossibleMoveCrazy(Board* b, int pawn_x, int pawn_y);
+static void PossibleMoveQueen(Board* b, int pawn_x, int pawn_y);
+static void PossibleMoveKing(Board* b, int pawn_x, int pawn_y);
 
 
 Board* MakeBoard() {
@@ -216,10 +219,10 @@ static void BoardHandleClick(Board* b) {
     switch(cell & 0x0f) {
         case PawnType_Pawn: PossibleMovePawn(b, b->overred_x, b->overred_y); break;
         case PawnType_Tower: PossibleMoveTower(b, b->overred_x, b->overred_y); break;
-        case PawnType_Knight: PossibleMoveKnight(b, b->overred_x, b->overred_y); break;
-        case PawnType_Crazy: break;
-        case PawnType_Queen: break;
-        case PawnType_King: break;
+        case PawnType_Knight: PossibleMoveKnight(b,b->overred_x, b->overred_y); break;
+        case PawnType_Crazy: PossibleMoveCrazy(b, b->overred_x, b->overred_y); break;
+        case PawnType_Queen: PossibleMoveQueen(b, b->overred_x, b->overred_y); break;
+        case PawnType_King: PossibleMoveKing(b, b->overred_x, b->overred_y); break;
         default: /* rien */ break;
     }
 }
@@ -413,5 +416,80 @@ static void PossibleMoveKnight(Board* b, int pawn_x, int pawn_y) {
     }
 
     if(can_eat_king) printf("CAN EAT KING\n");
+    //return can_eat_king;
+}
+
+static void PossibleMoveCrazy(Board* b, int pawn_x, int pawn_y) {
+    printf("Crazy\n");
+    unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
+
+    bool can_eat_king = false;  //true si la pièce est en mesure de capturer le roi adverse
+    const int relative_positions[4][2] = {
+            {-1,-1},    //haut gauche
+            {-1,1},     //haut droite
+            {1,-1},     //bas gauche
+            {1,1},      //bas droite
+    };
+
+    //Faire toutes les diagonales de la pièce
+    for(int i = 0; i < 4; i++) {
+        int offset_x = relative_positions[i][0];
+        int offset_y = relative_positions[i][1];
+
+        int pos_x = pawn_x + offset_x;
+        int pos_y = pawn_y + offset_y;
+
+        while(pos_x >= 0 && pos_x < 8 && pos_y >= 0 && pos_y < 8) {
+            unsigned char pawn_other = BoardGetPawn(b, pos_x, pos_y);
+            int capture = CanCapture(pawn, pawn_other);
+            if(capture == 2) {      //roi adverse
+                can_eat_king = true;
+                break;
+            }
+            else if(pawn_other == 0 || capture == 1) {  //aucune pièce sur la case ou pièce adverse
+                SetPossibleMove(b, pos_x, pos_y, 1);
+            }
+
+            if(pawn_other != 0) break;
+
+            pos_x += offset_x;
+            pos_y += offset_y;
+        }
+    }
+
+    if(can_eat_king) printf("CAN EAT KING\n");
+    //return can_eat_king;
+}
+
+static void PossibleMoveQueen(Board* b, int pawn_x, int pawn_y) {
+    PossibleMoveTower(b, pawn_x, pawn_y);
+    PossibleMoveCrazy(b, pawn_x, pawn_y);
+
+    //bool can_eat_king = PossibleMoveTower(b, pawn_x, pawn_y) | PossibleMoveCrazy(b, pawn_x, pawn_y);
+    //return can_eat_king;
+}
+
+static void PossibleMoveKing(Board* b, int pawn_x, int pawn_y) {
+    printf("King\n");
+    unsigned char pawn = BoardGetPawn(b, pawn_x, pawn_y);
+
+    bool can_eat_king = false;  //true si la pièce est en mesure de capturer le roi adverse
+
+    for(int offset_y = -1; offset_y < 2; offset_y++) {
+        for(int offset_x = -1; offset_x < 2; offset_x++) {
+            if(offset_x == 0 && offset_y == 0) continue;
+
+            unsigned char pawn_other = BoardGetPawn(b, pawn_x+offset_x, pawn_y+offset_y);
+            int capture = CanCapture(pawn, pawn_other);
+
+            if(capture == 2) {      //roi adverse
+                can_eat_king = true;
+            }
+            else if(pawn_other == 0 || capture == 1) {  //aucune pièce sur la case ou pièce adverse
+                SetPossibleMove(b, pawn_x+offset_x, pawn_y+offset_y, 1);
+            }
+        }
+    }
+
     //return can_eat_king;
 }
